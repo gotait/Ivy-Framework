@@ -3,12 +3,19 @@ using Fortnox.SDK.Auth;
 using Fortnox.SDK.Authorization;
 using Fortnox.SDK.Exceptions;
 using Ivy.Hooks;
-using Ivy.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using System.Reflection;
 
 namespace Ivy.Auth.Fortnox;
+
+public class FortnoxOAuthException(string? error, string? errorCode, string? errorDescription)
+    : Exception($"Fortnox error: '{error}', code '{errorCode}' - {errorDescription}")
+{
+    public string? Error { get; } = error;
+    public string? ErrorCode { get; } = errorCode;
+    public string? ErrorDescription { get; } = errorDescription;
+}
 
 public class FortnoxAuthProvider : IAuthProvider
 {
@@ -41,15 +48,36 @@ public class FortnoxAuthProvider : IAuthProvider
 
     public async Task<Uri> GetOAuthUriAsync(AuthOption option, WebhookEndpoint callback)
     {
-        var state = _authClient.StandardAuthWorkflow.GenerateState();
-        var uri = _authClient.StandardAuthWorkflow.BuildAuthUri(_clientId, _scopes, state, callback.GetUri().ToString());
+        var uri = _authClient.StandardAuthWorkflow.BuildAuthUri(_clientId, _scopes, callback.Id, callback.GetUri(false).ToString());
         return await Task.FromResult(uri);
     }
 
-    public Task<AuthToken?> HandleOAuthCallbackAsync(HttpRequest request)
+    public async Task<AuthToken?> HandleOAuthCallbackAsync(HttpRequest request)
     {
-        // TODO: Implement handling of OAuth callback from Fortnox
-        throw new NotImplementedException();
+        var code = request.Query["code"].ToString();
+        var error = request.Query["error"].ToString();
+        var errorDescription = request.Query["error_description"].ToString();
+
+        if (error.Length > 0 || errorDescription.Length > 0)
+        {
+            throw new FortnoxOAuthException(error, null, errorDescription);
+        }
+        else if (code.Length == 0)
+        {
+            throw new Exception("Received no authorization code from Fortnox.");
+        }
+
+        var redirectUri = $"{request.Scheme}://{request.Host}{request.Path}";
+
+        var tokenInfo = await _authClient.StandardAuthWorkflow.GetTokenAsync(code, _clientId, _clientSecret, redirectUri);
+        var accessToken = tokenInfo.AccessToken;
+        var refreshToken = tokenInfo.RefreshToken;
+
+        return new AuthToken(
+            accessToken,
+            refreshToken,
+            DateTime.Now + TimeSpan.FromSeconds(tokenInfo.ExpiresIn)
+        );
     }
 
     public Task LogoutAsync(string _) => Task.CompletedTask;
@@ -80,8 +108,11 @@ public class FortnoxAuthProvider : IAuthProvider
     {
         try
         {
-            var info = await _authClient.StandardAuthWorkflow.GetTokenAsync(jwt, _clientId, _clientSecret);
-            return info is not null;
+            // Try to access a protected resource to validate the JWT
+            var auth = new StandardAuth(jwt);
+            var client = new FortnoxClient(auth);
+            var profile = await client.ProfileConnector.GetAsync();
+            return profile is not null;
         }
         catch (FortnoxApiException)
         {
@@ -111,7 +142,7 @@ public class FortnoxAuthProvider : IAuthProvider
 
     public FortnoxAuthProvider UseFortnox()
     {
-        _authOptions.Add(new AuthOption(AuthFlow.OAuth, "Fortnox", "fortnox", Icons.None)); //< TODO: Add Fortnox icon
+        _authOptions.Add(new AuthOption(AuthFlow.OAuth, "Fortnox", "fortnox"));
         return this;
     }
 
