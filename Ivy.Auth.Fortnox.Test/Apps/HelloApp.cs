@@ -1,8 +1,7 @@
-﻿using System.Threading.Tasks;
 using Ivy.Apps;
 using Ivy.Core;
 
-namespace Ivy.Auth.Supabase.Test.Apps;
+namespace Ivy.Auth.Fortnox.Test.Apps;
 
 [App]
 public class HelloApp : ViewBase
