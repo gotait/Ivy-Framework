@@ -38,8 +38,8 @@ public class FortnoxAuthProvider : IAuthProvider
             .AddUserSecrets(Assembly.GetEntryAssembly()!)
             .Build();
 
-        _clientId = configuration.GetValue<string>("FORTNOX_CLIENT_ID") ?? throw new Exception("FORTNOX_CLIENT_ID is required");
-        _clientSecret = configuration.GetValue<string>("FORTNOX_CLIENT_SECRET") ?? throw new Exception("FORTNOX_CLIENT_SECRET is required");
+        _clientId = configuration.GetValue<string>("Fortnox:ClientId") ?? throw new Exception("Fortnox:ClientId is required");
+        _clientSecret = configuration.GetValue<string>("Fortnox:ClientSecret") ?? throw new Exception("Fortnox:ClientSecret is required");
 
         _authClient = new FortnoxAuthClient();
     }
