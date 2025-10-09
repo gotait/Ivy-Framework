@@ -21,7 +21,7 @@ public class FortnoxAuthProvider : IAuthProvider
 {
     private readonly FortnoxAuthClient _authClient;
 
-    private readonly Scope[] _scopes;
+    private Scope[] _scopes;
     private readonly string _clientId;
     private readonly string _clientSecret;
 
@@ -143,6 +143,12 @@ public class FortnoxAuthProvider : IAuthProvider
     public FortnoxAuthProvider UseFortnox()
     {
         _authOptions.Add(new AuthOption(AuthFlow.OAuth, "Fortnox", "fortnox"));
+        return this;
+    }
+
+    public FortnoxAuthProvider WithScopes(Scope[] scopes)
+    {
+        _scopes = scopes;
         return this;
     }
 
